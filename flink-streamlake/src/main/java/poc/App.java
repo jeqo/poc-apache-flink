@@ -1,5 +1,7 @@
 package poc;
 
+import com.twitter.chill.java.UnmodifiableMapSerializer;
+import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.serialization.SimpleStringSchema;
@@ -8,8 +10,12 @@ import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
 import org.apache.flink.connector.kafka.sink.KafkaSink;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
+import org.apache.flink.connector.kafka.source.reader.deserializer.KafkaRecordDeserializationSchema;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.Collector;
+import org.apache.kafka.server.log.remote.storage.RemoteLogMetadata;
+import org.apache.kafka.server.log.remote.storage.RemoteLogSegmentMetadata;
+import org.apache.kafka.server.log.remote.storage.RemoteLogSegmentMetadataUpdate;
 
 public class App {
     final StreamExecutionEnvironment env;
@@ -18,19 +24,29 @@ public class App {
         this.env = env;
     }
 
-    public void build() {
-        final var source = KafkaSource.<String>builder()
+    public void build() throws ClassNotFoundException {
+        env.getConfig().registerKryoType(RemoteLogMetadata.class);
+        env.getConfig().registerKryoType(RemoteLogSegmentMetadata.class);
+        env.getConfig().registerKryoType(RemoteLogSegmentMetadataUpdate.class);
+        
+        // https://stackoverflow.com/a/32453031/4113777
+        Class<?> unmodMapClass = Class.forName("java.util.Collections$UnmodifiableMap");
+        env.getConfig().addDefaultKryoSerializer(unmodMapClass, UnmodifiableMapSerializer.class);
+
+        final var deserializer = KafkaRecordDeserializationSchema.valueOnly(RemoteLogMetadataDeserializer.class);
+
+        final var source = KafkaSource.<RemoteLogMetadata>builder()
             .setBootstrapServers("localhost:9092")
-            .setTopics("topic1")
-            .setGroupId("my-group")
+            .setTopics("__remote_log_metadata")
+            .setGroupId("flink-app-v1")
             .setStartingOffsets(OffsetsInitializer.earliest())
-            .setValueOnlyDeserializer(new SimpleStringSchema())
+            .setDeserializer(deserializer)
             .build();
-        final var kafkaSource = env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source");
+        final var kafkaSource = env.fromSource(source, WatermarkStrategy.noWatermarks(), "kafka:remote-log-metadata");
 
         final var serializer = KafkaRecordSerializationSchema.builder()
             .setValueSerializationSchema(new SimpleStringSchema())
-            .setTopic("output-topic1")
+            .setTopic("output-t1")
             .build();
 
         final var kafkaSink = KafkaSink.<String>builder()
@@ -38,7 +54,9 @@ public class App {
             .setRecordSerializer(serializer)
             .build();
 
-        kafkaSource.sinkTo(kafkaSink);
+        kafkaSource
+            .map(remoteLogMetadata -> remoteLogMetadata.topicIdPartition().toString())
+            .sinkTo(kafkaSink);
     }
 
     public static void main(String[] args) throws Exception {
