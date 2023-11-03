@@ -55,6 +55,23 @@
             <version>0.45</version>
         </dependency>
 
+        <!-- Kafka TS Plugin -->
+        <dependency>
+            <groupId>io.aiven.kafka</groupId>
+            <artifactId>kafka-ts-plugin-core</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>io.aiven.kafka</groupId>
+            <artifactId>kafka-ts-plugin-storage-s3</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jdk8</artifactId>
+            <version>2.15.2</version>
+        </dependency>
+
         <!-- Add logging framework, to produce console output when running in the IDE. -->
         <!-- These dependencies are excluded from the application JAR by default. -->
         <dependency>
