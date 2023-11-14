@@ -76,3 +76,12 @@ services:
       /usr/bin/mc mb local/test-bucket;
       exit 0;
       "
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.2
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
+    depends_on:
+      - kafka
