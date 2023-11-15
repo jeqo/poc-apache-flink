@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.util.Map;
 
 public class App {
+    static final String TOPIC = "t2";
     final StreamExecutionEnvironment env;
 
     public App(StreamExecutionEnvironment env) {
@@ -82,7 +83,7 @@ public class App {
                 .process(new RemoteLogMetadataMerger());
 
         final var srClient = new CachedSchemaRegistryClient("http://localhost:8081", 100);
-        final var schemas = srClient.getSchemas("t2-value", false, true);
+        final var schemas = srClient.getSchemas(TOPIC + "-value", false, true);
         final var schema = schemas.get(0);
         final var parse = Schema.parse(schema.canonicalString());
 
@@ -117,10 +118,10 @@ public class App {
                     try (final var records = recordBatch.streamingIterator(BufferSupplier.create())) {
                         while (records.hasNext()) {
                             final var record = records.next();
-                            if (remoteLogSegmentMetadata.topicIdPartition().topic().equals("t2")) {
+                            if (remoteLogSegmentMetadata.topicIdPartition().topic().equals(TOPIC)) {
                                 byte[] dst = new byte[record.valueSize()];
                                 record.value().get(dst);
-                                final var schemaAndValue = serde.deserializer().deserialize("t2", dst);
+                                final var schemaAndValue = serde.deserializer().deserialize(TOPIC, dst);
                                 final var valueData = new AvroData(100).fromConnectData(schemaAndValue.schema(), schemaAndValue.value());
 
                                 collector.collect((GenericRecord) valueData);
